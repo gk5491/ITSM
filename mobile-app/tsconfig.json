@@ -1,0 +1,10 @@
+{
+  "extends": "expo/tsconfig.base",
+  "include": ["App.tsx", "**/*.ts", "**/*.tsx"],
+  "exclude": ["node_modules", "dist", "build"],
+  "compilerOptions": {
+    "strict": true,
+    "jsx": "react-native",
+    "noEmit": true
+  }
+}
