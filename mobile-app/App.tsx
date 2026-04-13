@@ -8,6 +8,7 @@ import {
   Alert,
   Text,
   Pressable,
+  Linking,
 } from 'react-native';
 import { WebView, WebViewNavigation } from 'react-native-webview';
 import { StatusBar } from 'expo-status-bar';
@@ -33,6 +34,7 @@ export default function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isOffline, setIsOffline] = useState(false);
   const [appReady, setAppReady] = useState(false);
+  const [lastUrl, setLastUrl] = useState(APP_URL);
 
   useEffect(() => {
     const unsubscribe = NetInfo.addEventListener((state) => {
@@ -75,6 +77,9 @@ export default function App() {
   }, [isOffline, appReady, onAppReady]);
 
   const handleNavigationStateChange = (navState: WebViewNavigation) => {
+    if (navState.url) {
+      setLastUrl(navState.url);
+    }
     setCanGoBack(navState.canGoBack);
   };
 
@@ -83,6 +88,13 @@ export default function App() {
     if (!appReady) {
       onAppReady();
     }
+  };
+
+  const handleLoadStart = (event: { nativeEvent: { url?: string } }) => {
+    if (event.nativeEvent?.url) {
+      setLastUrl(event.nativeEvent.url);
+    }
+    setIsLoading(true);
   };
 
   const handleError = (_event: WebViewErrorEvent) => {
@@ -100,7 +112,9 @@ export default function App() {
     const domain = errorDomain && errorDomain !== 'undefined' ? errorDomain : APP_URL;
     const description = errorDesc || 'Unable to load the portal.';
     const isSslIssue =
-      /ssl|certificate|cert|trust/i.test(description) || errorCode === 3;
+      /ssl|certificate|cert|trust|authority|handshake/i.test(description);
+    const isNetworkIssue =
+      /timed out|timeout|network|internet|host lookup|dns|connection/i.test(description);
 
     return (
       <View style={styles.errorContainer}>
@@ -108,10 +122,14 @@ export default function App() {
         <Text style={styles.errorText}>
           {isSslIssue
             ? 'The server certificate is not trusted by Android WebView. This needs to be fixed on the backend.'
-            : description}
+            : isNetworkIssue
+              ? 'Network is unstable or blocked. Please try another Wi-Fi/mobile network and tap Try Again.'
+              : description}
         </Text>
         <Text style={styles.errorMeta}>Domain: {domain}</Text>
+        <Text style={styles.errorMeta}>URL: {lastUrl}</Text>
         <Text style={styles.errorMeta}>Error Code: {errorCode}</Text>
+        <Text style={styles.errorMeta}>Details: {description}</Text>
         <Pressable
           style={styles.retryButton}
           onPress={() => {
@@ -120,6 +138,15 @@ export default function App() {
           }}
         >
           <Text style={styles.retryButtonText}>Try Again</Text>
+        </Pressable>
+        <Pressable
+          style={styles.openBrowserButton}
+          onPress={() => {
+            const target = lastUrl || APP_URL;
+            Linking.openURL(target).catch(() => {});
+          }}
+        >
+          <Text style={styles.openBrowserButtonText}>Open In Browser</Text>
         </Pressable>
       </View>
     );
@@ -147,6 +174,7 @@ export default function App() {
         source={{ uri: APP_URL }}
         style={styles.webview}
         onNavigationStateChange={handleNavigationStateChange}
+        onLoadStart={handleLoadStart}
         onLoadEnd={handleLoadEnd}
         onError={handleError}
         renderError={renderError}
@@ -225,6 +253,19 @@ const styles = StyleSheet.create({
   },
   retryButtonText: {
     color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  openBrowserButton: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: BRAND_BLUE,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 12,
+  },
+  openBrowserButtonText: {
+    color: BRAND_BLUE,
     fontSize: 16,
     fontWeight: '600',
   },
